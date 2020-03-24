@@ -3,6 +3,10 @@ package xyz.luchengeng.callr.bean
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
@@ -17,38 +21,40 @@ class HostPool(private val initSize : Int,
                private val rExecPath : String ,
                private var basePort : Int) {
     private val freePorts = mutableListOf<Int>()
+    private val logger = LoggerFactory.getLogger(this::class.java)
     var hostCreationRequest : Int = 0
-    inner class RHost(val port : Int,val rExec : String,val rScriptPath : String,var usageFlag : Int){
-        val process : Process = ProcessBuilder().command(rExec,rScriptPath,port.toString()).start()
+    inner class RHost(val port : Int, rExec : String, rScriptPath : String){
+        private val process : Process = ProcessBuilder().command(rExec,rScriptPath,port.toString()).start()
         init{
-            val errorGobbler = StreamGobbler(process.getErrorStream())
+            val errorGobbler = StreamGobbler(process.errorStream){
+                logger.warn(it)
+            }
             errorGobbler.start()
-            val outputGobbler = StreamGobbler(process.getInputStream())
+            val outputGobbler = StreamGobbler(process.inputStream){
+                logger.info(it)
+            }
             outputGobbler.start()
         }
         fun terminate(){
-            println("Destroying server at $port")
+            logger.info("Destroying server at $port")
             process.destroyForcibly()
         }
-        constructor(port : Int) :this(port, rExecPath, this@HostPool.rScriptPath, usageFlag = 0)
+        constructor(port : Int) :this(port, rExecPath, this@HostPool.rScriptPath)
     }
 
-    class StreamGobbler(ist: InputStream) : Thread() {
-        var ist: InputStream
+    class StreamGobbler(private val ist: InputStream, val logger : (String?)->Unit) : Thread() {
+
         override fun run() {
             try {
                 val isr = InputStreamReader(ist)
                 val br = BufferedReader(isr)
                 var line: String? = null
-                while (br.readLine().also { line = it } != null) println(line)
+                while (br.readLine().also { line = it } != null){
+                    logger(line)
+                }
             } catch (ioe: IOException) {
                 ioe.printStackTrace()
             }
-        }
-
-        // reads everything from is until empty.
-        init {
-            this.ist= ist
         }
     }
     private val hostQueue : LinkedBlockingQueue<RHost> = LinkedBlockingQueue()
@@ -65,61 +71,14 @@ class HostPool(private val initSize : Int,
             hostQueue.take().terminate()
         }
     }
-    private fun creationLoop()=GlobalScope.launch {
-        while(true){
-            repeat(this@HostPool.hostCreationRequest){
-                hostQueue.add(RHost(portFetch()))
-            }
-            hostCreationRequest = 0
-            delay(10)
-        }
-    }
 
-    private fun destructionLoop()=GlobalScope.launch {
-        while(true){
-            var idleCount = 0
-            hostQueue.forEach{
-                if(it.usageFlag == 0){
-                    idleCount++
-                }
-                it.usageFlag = 0
-            }
-            repeat(idleCount){
-                portRecycle(hostQueue.take())
-            }
-            delay(1000)
-        }
-    }
-
-    private fun serverListening(host: String = "localhost", port: Int): Boolean {
-        var s: Socket? = null
-        return try {
-            s = Socket(host, port)
-            true
-        } catch (e: Exception) {
-            false
-        } finally {
-            if (s != null) try {
-                s.close()
-            } catch (e: Exception) {
-            }
-        }
-    }
-
-    private fun portFetch() : Int = this.freePorts.run {
-        if(this.size != 0){
-            this.removeAt(0)
-        }else{
-            basePort++
-            if(!serverListening(port = basePort))basePort else portFetch()
-        }
-    }
-
-    private fun portRecycle(host : RHost){
-        host.terminate()
-        GlobalScope.launch {
-            delay(100)
-            if(!serverListening("localhost",host.port))freePorts.add(host.port)
-        }
+    operator fun invoke(path : String,func : okhttp3.Request.Builder.(  )-> Unit ) : okhttp3.Response {
+        val host = this.hostQueue.take()
+        val request = okhttp3.Request.Builder()
+                .url("http://127.0.0.1:${host.port}"+path)
+        request.func()
+        val response = okhttp3.OkHttpClient().newCall(request.build()).execute()
+        this.hostQueue.add(host)
+        return response
     }
 }
