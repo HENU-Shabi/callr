@@ -4,8 +4,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
-class CallrApplication
+internal class CallrApplication
 
-fun main(args: Array<String>) {
+internal fun main(args: Array<String>) {
     runApplication<CallrApplication>(*args)
 }
