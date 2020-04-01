@@ -1,5 +1,6 @@
 package xyz.luchengeng.callr.bean
 
+import okhttp3.OkHttpClient
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
@@ -28,13 +29,20 @@ abstract class BaseHostPool(protected val initSize: Int, protected var basePort:
         val request = okhttp3.Request.Builder()
                 .url("http://127.0.0.1:${host.port}" + path)
         request.func()
-        val response = okhttp3.OkHttpClient().newCall(request.build()).execute()
-        this.hostQueue.add(host)
-        return response
+        try {
+            return OkHttpClient().newCall(request.build()).execute()
+        } finally {
+            this.hostQueue.add(host)
+        }
     }
 
     abstract class BaseRHost(val port: Int) {
         private val logger: Logger = LoggerFactory.getLogger(this::class.java)
+
+        init {
+            logger.info("Starting server at $port")
+        }
+
         protected abstract val process: Process
         fun terminate() {
             logger.info("Destroying server at $port")
