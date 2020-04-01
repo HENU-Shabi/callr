@@ -7,10 +7,10 @@ import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestMethod
-import xyz.luchengeng.callr.bean.BaseHostPool
+import xyz.luchengeng.callr.bean.HostPool
 
 @Controller
-internal class TestController @Autowired constructor(private val hostPool: BaseHostPool) {
+internal class TestController @Autowired constructor(private val hostPool: HostPool) {
     private val testDataCsv: String =
             "OS,OS_Event,genValue\n" +
                     "1858,0,5.507042253521127E-4\n" +

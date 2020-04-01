@@ -11,7 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import javax.annotation.PostConstruct
 import javax.annotation.PreDestroy
 
-abstract class BaseHostPool(protected val initSize: Int, protected var basePort: Int, protected val rExecPath: String) {
+abstract class HostPool(protected val initSize: Int, protected var basePort: Int, protected val rExecPath: String) {
     protected val hostQueue: LinkedBlockingQueue<BaseRHost> = LinkedBlockingQueue()
 
     @PostConstruct

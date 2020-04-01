@@ -9,10 +9,10 @@ import java.io.FileWriter
 class ExternalHostPool(initSize: Int,
                        private val rScriptPath: String,
                        rExecPath: String,
-                       basePort: Int) : BaseHostPool(initSize, basePort, rExecPath) {
+                       basePort: Int) : HostPool(initSize, basePort, rExecPath) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    inner class ExternalRHost(port: Int, rExec: String, rScriptPath: String) : BaseHostPool.BaseRHost(port) {
+    inner class ExternalRHost(port: Int, rExec: String, rScriptPath: String) : HostPool.BaseRHost(port) {
         override val process: Process = ProcessBuilder().command(rExec, rScriptPath, port.toString()).start()
 
         init {
@@ -33,7 +33,7 @@ class ExternalHostPool(initSize: Int,
     }
 }
 
-fun unpack(initPath: String?, apiPath: String): Pair<File, File> =
+internal fun unpack(initPath: String?, apiPath: String): Pair<File, File> =
         Pair(File.createTempFile("rPoolInit", ".R").apply {
             var mainR = FileReader(ClassPathResource("lib.R").file).readText() + "\n"
             if (initPath != null) mainR += FileReader(ClassPathResource(initPath).file).readText() + "\n"
